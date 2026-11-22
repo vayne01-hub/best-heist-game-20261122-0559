@@ -299,7 +299,8 @@ export class Game {
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall:
       // south door out of the Entry Hall, south row across the Gallery,
-      // south door into the Office, around the desk, north door to the Vault.
+      // south door into the Office, wait in the office south-east corner
+      // (clear of Mara's route) for her south row, then the Vault door gap.
       this.autopilot = {
         waypoints: [
           { x: 200, y: 300 },
@@ -310,17 +311,16 @@ export class Game {
           { x: 860, y: 620 },
           { x: 933, y: 510 },
           { x: 1000, y: 560 },
-          { x: 1090, y: 560 },
           { x: 1200, y: 560 },
+          { x: 1250, y: 560, gate: 'vaultClear' },
           { x: 1200, y: 420 },
-          { x: 1090, y: 420, gate: 'vaultClear' },
+          { x: 1090, y: 420 },
           { x: 1090, y: 350 },
           { x: 1150, y: 180, vault: true },
           { x: 1090, y: 350 },
           { x: 1090, y: 420 },
           { x: 1200, y: 420 },
           { x: 1200, y: 560 },
-          { x: 1090, y: 560 },
           { x: 1000, y: 560 },
           { x: 933, y: 510 },
           { x: 860, y: 620 },
@@ -348,11 +348,13 @@ export class Game {
     const target = plan.waypoints[plan.index];
     if (!target) return;
 
-    // Gate: do not enter the vault room while Mara patrols its north side.
+    // Gate: do not enter the vault room until Mara is on the office south
+    // row, well away from the vault: the thief then has her whole return
+    // north to crack the vault and slip back through the door gap.
     if (target.gate === 'vaultClear') {
       const mara = this.guards[1];
-      const nearVault = Math.hypot(mara.x - 1150, mara.y - 180) < 320;
-      if (nearVault && mara.y < 420) {
+      const nearVault = Math.hypot(mara.x - 1150, mara.y - 180) < 300;
+      if (nearVault || mara.y <= 500) {
         this.waitInfo = `gate:mara@(${Math.round(mara.x)},${Math.round(mara.y)})`;
         this.setMoveInput(null);
         return;
@@ -374,9 +376,10 @@ export class Game {
       return;
     }
 
-    // Threat: a guard that sees the thief, or is close with its cone turned
-    // toward the thief, is retreated from at walk speed (faster than a
-    // chasing guard); freezing inside a cone is what gets a thief caught.
+    // Threat: a guard that sees the thief, is close enough to touch, or is
+    // close with its cone turned toward the thief, is retreated from at
+    // walk speed (faster than a chasing guard); freezing inside a cone is
+    // what gets a thief caught.
     for (const guard of this.guards) {
       const dx = this.thief.x - guard.x;
       const dy = this.thief.y - guard.y;
@@ -385,7 +388,7 @@ export class Game {
       let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
       if (diff > Math.PI) diff = Math.PI * 2 - diff;
       const sees = guard.canSeeThief(this.thief, this.level.solids, this.smokes);
-      if (sees || (dist < 200 && diff < 1.0)) {
+      if (sees || dist < 90 || (dist < 200 && diff < 1.0)) {
         const len = Math.hypot(dx, dy) || 1;
         this.input.left = dx / len < -0.3;
         this.input.right = dx / len > 0.3;
@@ -426,14 +429,13 @@ export class Game {
       this.setMoveInput(null);
       return;
     }
-    const nearGuard = this.guards.some(
-      (guard) => Math.hypot(guard.x - this.thief.x, guard.y - this.thief.y) < 180,
-    );
+    // The driver walks everywhere: it outruns a chasing guard (150 vs 108)
+    // and the vault round trip fits inside Mara's return north.
     this.input.left = dx < -4;
     this.input.right = dx > 4;
     this.input.up = dy < -4;
     this.input.down = dy > 4;
-    this.input.sneak = nearGuard;
+    this.input.sneak = false;
     this.input.interact = Boolean(this.thief.nearestLoot(this.level));
     this.input.clickTarget = null;
   }
