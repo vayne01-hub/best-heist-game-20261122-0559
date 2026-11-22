@@ -642,9 +642,19 @@ export class Game {
     const dy = target.y - this.thief.y;
     const dist = Math.hypot(dx, dy);
     if (dist < 14) {
-      plan.index += 1;
-      this.setMoveInput(null);
-      return;
+      // Do not advance past the vault before cracking it: the waypoint
+      // sits 42px from the vault and the 14px arrival circle is entered
+      // while the thief is still 51-56px from it, outside the 48px crack
+      // range — advancing here walks away with the vault uncracked (the
+      // run then fled, met Rocco on the south row, and died). Keep
+      // walking to the waypoint centre instead; the crack block above
+      // fires once inside 48px, and after the vault is taken this check
+      // advances as normal.
+      if (!(target.vault && !this.vaultTaken)) {
+        plan.index += 1;
+        this.setMoveInput(null);
+        return;
+      }
     }
     // Do not rear-end a patrolling guard: the thief (150) is faster
     // than a guard (55), so walking straight at one from behind runs
