@@ -36,6 +36,7 @@ export class Game {
     this.testOutcome = null;
     this.waitInfo = null;
     this.fleeIndex = null;
+    this.hiding = false;
     this.restarted = false;
     this.autopilot = null;
     this.shotMode = false;
@@ -304,6 +305,7 @@ export class Game {
     this.testMode = mode;
     this.smokeUsedAtVault = false;
     this.fleeIndex = null;
+    this.hiding = false;
     this.restart();
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall:
@@ -393,13 +395,39 @@ export class Game {
         break;
       }
     }
-    if (threat && this.fleeIndex === null) {
+    if (threat && this.fleeIndex === null && !this.hiding) {
       // Fall back one route step at a time, toward the waypoint behind
       // the one the thief is heading for: consecutive waypoints are
       // valid route segments, so the flee path never runs into a wall.
       // (Retargeting two steps at once wedged the thief on the office
       // wall, whose door gap the straight line missed.)
       this.fleeIndex = Math.max(0, plan.index - 1);
+    }
+    // Hiding: the thief ran to the Storage hide while chased; stay there
+    // until the threat clears, then resume the route from waypoint 1.
+    if (this.hiding) {
+      const hide = { x: 150, y: 650 };
+      const hdx = hide.x - this.thief.x;
+      const hdy = hide.y - this.thief.y;
+      if (!threat) {
+        this.hiding = false;
+        this.fleeIndex = null;
+        plan.index = 1;
+      } else if (Math.hypot(hdx, hdy) < 14) {
+        this.setMoveInput(null);
+        this.waitInfo = `hide:${threat.name}`;
+        return;
+      } else {
+        this.input.left = hdx < -4;
+        this.input.right = hdx > 4;
+        this.input.up = hdy < -4;
+        this.input.down = hdy > 4;
+        this.input.sneak = false;
+        this.input.interact = false;
+        this.input.clickTarget = null;
+        this.waitInfo = `hide:${threat.name}`;
+        return;
+      }
     }
     if (this.fleeIndex !== null) {
       const fleePoint = plan.waypoints[this.fleeIndex];
@@ -410,11 +438,13 @@ export class Game {
           // Still hunted on arrival: fall one more route step back.
           this.fleeIndex -= 1;
         } else if (threat) {
-          // Backed all the way to the first waypoint: hold here, the
-          // Entry Hall is out of both guards' patrols.
-          this.setMoveInput(null);
-          this.waitInfo = `flee:${threat.name}`;
-          return;
+          // Backed all the way to the first waypoint with a guard still
+          // chasing: do not stand still in the Entry Hall, the chasing
+          // guard follows the thief out of its patrol and catches it
+          // there. Run to the Storage hide instead, where the west
+          // divider wall breaks the guard's line of sight and it gives
+          // up the chase within a few seconds.
+          this.hiding = true;
         } else {
           // Safe: resume the route forward from the waypoint reached.
           plan.index = this.fleeIndex + 1;
@@ -437,8 +467,11 @@ export class Game {
     // Door gate: do not step through the east divider's south door into
     // the Office while Mara is near it or Rocco is near it on the gallery
     // side. The thief waits on the gallery south row, where the wall
-    // hides it from Mara and Rocco's patrol passes it facing away, until
-    // both guards are clear of the door. Without this the thief
+    // hides it from Mara, until both guards are clear of the door.
+    // Rocco counts as near the door while he is on the gallery south
+    // leg at all: his south leg runs 20px north of the row, and he sees
+    // the thief waiting or crossing it from anywhere on that leg, even
+    // though he is far from the door itself. Without this the thief
     // re-entered the office straight into a chase, and the two wedged
     // each other at the door corner while the alarm climbed. Two hold
     // spots: (500, 620) on the way in, and (860, 620) when it has just
@@ -448,7 +481,8 @@ export class Game {
       const rocco = this.guards[0];
       return (
         Math.hypot(mara.x - 928, mara.y - 510) >= 300 &&
-        Math.hypot(rocco.x - 928, rocco.y - 510) >= 300
+        Math.hypot(rocco.x - 928, rocco.y - 510) >= 300 &&
+        rocco.y < 500
       );
     };
     if (plan.index === 5 && Math.hypot(this.thief.x - 500, this.thief.y - 620) < 30 && !doorClear()) {
