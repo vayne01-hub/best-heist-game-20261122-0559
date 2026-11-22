@@ -294,6 +294,7 @@ export class Game {
 
   beginTest(mode) {
     this.testMode = mode;
+    this.smokeUsedAtVault = false;
     this.restart();
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall:
@@ -314,7 +315,7 @@ export class Game {
           { x: 1200, y: 420 },
           { x: 1090, y: 420, gate: 'vaultClear' },
           { x: 1090, y: 350 },
-          { x: 1150, y: 180 },
+          { x: 1150, y: 180, vault: true },
           { x: 1090, y: 350 },
           { x: 1090, y: 420 },
           { x: 1200, y: 420 },
@@ -358,7 +359,48 @@ export class Game {
       }
     }
 
-    // Wait out a guard whose cone is turned toward the thief.
+    // Stand still on the vault until it is cracked: advancing the waypoint
+    // early would walk away mid-channel and the crack would never finish.
+    if (target.vault && !this.vaultTaken) {
+      const mara = this.guards[1];
+      const maraDist = Math.hypot(mara.x - this.thief.x, mara.y - this.thief.y);
+      if (maraDist < 320 && this.thief.smokeCharges > 0 && !this.smokeUsedAtVault) {
+        this.throwSmoke();
+        this.smokeUsedAtVault = true;
+      }
+      this.setMoveInput(null);
+      this.input.interact = true;
+      this.waitInfo = 'cracking';
+      return;
+    }
+
+    // Threat: a guard that sees the thief, or is close with its cone turned
+    // toward the thief, is retreated from at walk speed (faster than a
+    // chasing guard); freezing inside a cone is what gets a thief caught.
+    for (const guard of this.guards) {
+      const dx = this.thief.x - guard.x;
+      const dy = this.thief.y - guard.y;
+      const dist = Math.hypot(dx, dy);
+      const toThief = Math.atan2(dy, dx);
+      let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
+      if (diff > Math.PI) diff = Math.PI * 2 - diff;
+      const sees = guard.canSeeThief(this.thief, this.level.solids, this.smokes);
+      if (sees || (dist < 200 && diff < 1.0)) {
+        const len = Math.hypot(dx, dy) || 1;
+        this.input.left = dx / len < -0.3;
+        this.input.right = dx / len > 0.3;
+        this.input.up = dy / len < -0.3;
+        this.input.down = dy / len > 0.3;
+        this.input.sneak = false;
+        this.input.interact = false;
+        this.input.clickTarget = null;
+        this.waitInfo = `retreat:${guard.name}@${Math.round(dist)}`;
+        return;
+      }
+    }
+
+    // Wait out a guard whose cone is turned toward the thief, but only
+    // while the thief is unseen: waiting inside a cone gets you caught.
     for (const guard of this.guards) {
       const dx = this.thief.x - guard.x;
       const dy = this.thief.y - guard.y;
@@ -367,8 +409,8 @@ export class Game {
         const toThief = Math.atan2(dy, dx);
         let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
-        if (diff < 0.9 && guard.state !== 'search') {
-          this.waitInfo = `guard:${guard.name}@(${Math.round(guard.x)},${Math.round(guard.y)}) angle=${guard.angle.toFixed(2)} toThief=${toThief.toFixed(2)} diff=${diff.toFixed(2)}`;
+        if (diff < 0.9 && guard.state !== 'search' && !guard.canSeeThief(this.thief, this.level.solids, this.smokes)) {
+          this.waitInfo = `wait:${guard.name}`;
           this.setMoveInput(null);
           return;
         }
@@ -385,7 +427,7 @@ export class Game {
       return;
     }
     const nearGuard = this.guards.some(
-      (guard) => Math.hypot(guard.x - this.thief.x, guard.y - this.thief.y) < 260,
+      (guard) => Math.hypot(guard.x - this.thief.x, guard.y - this.thief.y) < 180,
     );
     this.input.left = dx < -4;
     this.input.right = dx > 4;
