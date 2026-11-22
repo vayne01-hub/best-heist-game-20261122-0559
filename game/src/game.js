@@ -35,8 +35,7 @@ export class Game {
     this.testDone = false;
     this.testOutcome = null;
     this.waitInfo = null;
-    this.fleeTarget = null;
-    this.fleeSteps = 0;
+    this.fleeIndex = null;
     this.restarted = false;
     this.autopilot = null;
     this.shotMode = false;
@@ -298,8 +297,7 @@ export class Game {
   beginTest(mode) {
     this.testMode = mode;
     this.smokeUsedAtVault = false;
-    this.fleeTarget = null;
-    this.fleeSteps = 0;
+    this.fleeIndex = null;
     this.restart();
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall:
@@ -374,28 +372,35 @@ export class Game {
         break;
       }
     }
-    if (threat && !this.fleeTarget) {
-      // Fall back one route step at a time: consecutive waypoints are
+    if (threat && this.fleeIndex === null) {
+      // Fall back one route step at a time, toward the waypoint behind
+      // the one the thief is heading for: consecutive waypoints are
       // valid route segments, so the flee path never runs into a wall.
-      // (Falling back two steps at once wedged the thief on the office
+      // (Retargeting two steps at once wedged the thief on the office
       // wall, whose door gap the straight line missed.)
-      this.fleeSteps = 1;
-      this.fleeTarget = plan.waypoints[Math.max(0, plan.index - this.fleeSteps)];
+      this.fleeIndex = Math.max(0, plan.index - 1);
     }
-    if (this.fleeTarget) {
-      const fdx = this.fleeTarget.x - this.thief.x;
-      const fdy = this.fleeTarget.y - this.thief.y;
-      if (Math.hypot(fdx, fdy) < 14) {
-        if (threat) {
+    if (this.fleeIndex !== null) {
+      const fleePoint = plan.waypoints[this.fleeIndex];
+      const fdx = fleePoint.x - this.thief.x;
+      const fdy = fleePoint.y - this.thief.y;
+      if (Math.hypot(fdx, fdy) < 8) {
+        if (threat && this.fleeIndex > 0) {
           // Still hunted on arrival: fall one more route step back.
-          this.fleeSteps += 1;
-          this.fleeTarget = plan.waypoints[Math.max(0, plan.index - this.fleeSteps)];
+          this.fleeIndex -= 1;
+        } else if (threat) {
+          // Backed all the way to the first waypoint: hold here, the
+          // Entry Hall is out of both guards' patrols.
+          this.setMoveInput(null);
+          this.waitInfo = `flee:${threat.name}`;
+          return;
         } else {
-          this.fleeTarget = null;
-          this.fleeSteps = 0;
+          // Safe: resume the route forward from the waypoint reached.
+          plan.index = this.fleeIndex + 1;
+          this.fleeIndex = null;
         }
       }
-      if (this.fleeTarget) {
+      if (this.fleeIndex !== null) {
         this.input.left = fdx < -4;
         this.input.right = fdx > 4;
         this.input.up = fdy < -4;
