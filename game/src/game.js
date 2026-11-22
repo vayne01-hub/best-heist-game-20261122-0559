@@ -37,6 +37,8 @@ export class Game {
     this.waitInfo = null;
     this.fleeIndex = null;
     this.hiding = false;
+    this.hideMode = null;
+    this.hideResumeIndex = null;
     this.restarted = false;
     this.autopilot = null;
     this.shotMode = false;
@@ -306,6 +308,8 @@ export class Game {
     this.smokeUsedAtVault = false;
     this.fleeIndex = null;
     this.hiding = false;
+    this.hideMode = null;
+    this.hideResumeIndex = null;
     this.restart();
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall:
@@ -403,19 +407,27 @@ export class Game {
       // wall, whose door gap the straight line missed.)
       this.fleeIndex = Math.max(0, plan.index - 1);
     }
-    // Hiding: the thief ran to the Storage hide while chased; stay there
-    // until the threat clears, then resume the route from waypoint 1.
+    // Hiding: the thief ran to the Storage hide (150, 650), deep in the
+    // Storage where the west divider wall breaks every guard's line of
+    // sight. A chase-hide ends when the threat clears and the route
+    // resumes from waypoint 1. A Rocco-hide ends when Rocco has left the
+    // gallery south leg, and the route resumes from waypoint 3 (the
+    // Storage door), the only safe way back onto the gallery south row.
     if (this.hiding) {
       const hide = { x: 150, y: 650 };
       const hdx = hide.x - this.thief.x;
       const hdy = hide.y - this.thief.y;
-      if (!threat) {
+      const hideDone =
+        this.hideMode === 'rocco' ? this.guards[0].y < 500 && !threat : !threat;
+      if (hideDone) {
         this.hiding = false;
         this.fleeIndex = null;
-        plan.index = 1;
+        plan.index = this.hideResumeIndex;
+        this.hideResumeIndex = null;
+        this.hideMode = null;
       } else if (Math.hypot(hdx, hdy) < 14) {
         this.setMoveInput(null);
-        this.waitInfo = `hide:${threat.name}`;
+        this.waitInfo = `hide:${threat ? threat.name : this.hideMode}`;
         return;
       } else {
         this.input.left = hdx < -4;
@@ -425,7 +437,7 @@ export class Game {
         this.input.sneak = false;
         this.input.interact = false;
         this.input.clickTarget = null;
-        this.waitInfo = `hide:${threat.name}`;
+        this.waitInfo = `hide:${threat ? threat.name : this.hideMode}`;
         return;
       }
     }
@@ -445,6 +457,8 @@ export class Game {
           // divider wall breaks the guard's line of sight and it gives
           // up the chase within a few seconds.
           this.hiding = true;
+          this.hideMode = 'flee';
+          this.hideResumeIndex = 1;
         } else {
           // Safe: resume the route forward from the waypoint reached.
           plan.index = this.fleeIndex + 1;
@@ -464,36 +478,30 @@ export class Game {
       }
     }
 
-    // Door gate: do not step through the east divider's south door into
-    // the Office while Mara is near it or Rocco is near it on the gallery
-    // side. The thief waits on the gallery south row, where the wall
-    // hides it from Mara, until both guards are clear of the door.
-    // Rocco counts as near the door while he is on the gallery south
-    // leg at all: his south leg runs 20px north of the row, and he sees
-    // the thief waiting or crossing it from anywhere on that leg, even
-    // though he is far from the door itself. Without this the thief
-    // re-entered the office straight into a chase, and the two wedged
-    // each other at the door corner while the alarm climbed. Two hold
-    // spots: (500, 620) on the way in, and (860, 620) when it has just
-    // fled back out of the office.
-    const doorClear = () => {
-      const mara = this.guards[1];
-      const rocco = this.guards[0];
-      return (
-        Math.hypot(mara.x - 928, mara.y - 510) >= 300 &&
-        Math.hypot(rocco.x - 928, rocco.y - 510) >= 300 &&
-        rocco.y < 500
-      );
-    };
-    if (plan.index === 5 && Math.hypot(this.thief.x - 500, this.thief.y - 620) < 30 && !doorClear()) {
-      this.waitInfo = 'door:wait';
+    // Door gates. Two separate hazards at the east door:
+    // (1) Rocco's south leg: it runs 20px north of the gallery south
+    // row, and he sees the thief waiting or crossing it from anywhere
+    // on that leg. While he is on it the thief does not set foot on the
+    // row at all: it hides in the Storage until he has left the leg.
+    // (2) Mara near the door: the thief waits for her at (500, 620),
+    // behind the wall from her and out of Rocco's cone while he is off
+    // the south leg. If it has already reached (860, 620) it steps back
+    // to (500, 620) first: (860, 620) sits 20px south of Rocco's east
+    // leg, and he sees the thief waiting there.
+    const maraNearDoor = Math.hypot(this.guards[1].x - 928, this.guards[1].y - 510) < 300;
+    if ((plan.index === 4 || plan.index === 5) && this.guards[0].y >= 500 && !this.hiding) {
+      this.hiding = true;
+      this.hideMode = 'rocco';
+      this.hideResumeIndex = 3;
+      this.fleeIndex = null;
+    }
+    if (plan.index === 5 && Math.hypot(this.thief.x - 500, this.thief.y - 620) < 30 && maraNearDoor) {
+      this.waitInfo = 'door:mara';
       this.setMoveInput(null);
       return;
     }
-    if (plan.index === 6 && Math.hypot(this.thief.x - 860, this.thief.y - 620) < 30 && !doorClear()) {
-      this.waitInfo = 'door:wait';
-      this.setMoveInput(null);
-      return;
+    if (plan.index === 6 && maraNearDoor && this.fleeIndex === null) {
+      this.fleeIndex = 4;
     }
 
     // Gate: do not enter the vault room until Mara is on the office south
