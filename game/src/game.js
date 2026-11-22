@@ -390,23 +390,23 @@ export class Game {
       // wall, whose door gap the straight line missed.)
       this.fleeIndex = Math.max(0, plan.index - 1);
     }
-    // Hiding: the thief ran to the Storage hide (150, 680), deep in the
+    // Hiding: the thief ran to the spawn (48, 300), deep in the
     // Storage where the west divider wall breaks every guard's line of
     // sight. A chase-hide ends when the threat clears and the route
     // resumes from waypoint 1. A Rocco-hide ends when Rocco has left the
     // gallery south leg, and the route resumes from waypoint 3 (the
     // Storage door), the only safe way back onto the gallery south row.
     if (this.hiding) {
-      // The hide is deep in the Storage (150, 650), but a thief east of
+      // The hide is the spawn (48, 300), but a thief east of
       // the west divider must cross that wall through its south door gap
       // first: a beeline to the hide from the gallery side runs straight
       // into the wall's south segment and stalls there, in Rocco's cone.
       // So the hide is two steps: the Storage door waypoint (320, 520)
       // while east of the wall, then the hide itself once through it.
-      // The hide sits south of the Storage crates (150, 680) so the
+      // Once through the wall the beeline to the spawn is clear, so the
       // beeline to it always has a southward component and slides around
       // them instead of stalling against one's east face.
-      const hide = this.thief.x > 362 ? { x: 320, y: 520 } : { x: 150, y: 680 };
+      const hide = this.thief.x > 362 ? { x: 320, y: 520 } : { x: 48, y: 300 };
       const hdx = hide.x - this.thief.x;
       const hdy = hide.y - this.thief.y;
       const hideDone =
@@ -541,6 +541,43 @@ export class Game {
       plan.index += 1;
       this.setMoveInput(null);
       return;
+    }
+    // Do not rear-end a patrolling guard: the thief (150) is faster
+    // than a guard (55), so walking straight at one from behind runs
+    // into its back and gets the thief caught. If a guard is just ahead
+    // on the thief's line of travel, sidestep perpendicular to the
+    // route, away from the guard, and pass it at a safe distance.
+    // (A guard facing the thief is already handled above: the threat
+    // check flees from it.)
+    if (dist > 1) {
+      const tAngle = Math.atan2(dy, dx);
+      for (const guard of this.guards) {
+        const gdx = guard.x - this.thief.x;
+        const gdy = guard.y - this.thief.y;
+        const gdist = Math.hypot(gdx, gdy);
+        if (gdist < 90) {
+          let aDiff = Math.abs(Math.atan2(gdy, gdx) - tAngle) % (Math.PI * 2);
+          if (aDiff > Math.PI) aDiff = Math.PI * 2 - aDiff;
+          if (aDiff < 0.7) {
+            // Perpendicular to the route, away from the guard.
+            let px = -dy / dist;
+            let py = dx / dist;
+            if (px * gdx + py * gdy > 0) {
+              px = -px;
+              py = -py;
+            }
+            this.input.left = px < -0.3;
+            this.input.right = px > 0.3;
+            this.input.up = py < -0.3;
+            this.input.down = py > 0.3;
+            this.input.sneak = false;
+            this.input.interact = false;
+            this.input.clickTarget = null;
+            this.waitInfo = `sidestep:${guard.name}`;
+            return;
+          }
+        }
+      }
     }
     // The driver walks everywhere: it outruns a chasing guard (150 vs 108)
     // and the vault round trip fits inside Mara's return north. Sneaking
