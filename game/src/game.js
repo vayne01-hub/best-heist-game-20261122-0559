@@ -33,6 +33,7 @@ export class Game {
     this.testMode = null;
     this.testDone = false;
     this.testOutcome = null;
+    this.waitInfo = null;
     this.restarted = false;
     this.autopilot = null;
     this.shotMode = false;
@@ -351,6 +352,7 @@ export class Game {
       const mara = this.guards[1];
       const nearVault = Math.hypot(mara.x - 1150, mara.y - 180) < 320;
       if (nearVault && mara.y < 420) {
+        this.waitInfo = `gate:mara@(${Math.round(mara.x)},${Math.round(mara.y)})`;
         this.setMoveInput(null);
         return;
       }
@@ -366,11 +368,13 @@ export class Game {
         let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
         if (diff < 0.9 && guard.state !== 'search') {
+          this.waitInfo = `guard:${guard.name}@(${Math.round(guard.x)},${Math.round(guard.y)}) angle=${guard.angle.toFixed(2)} toThief=${toThief.toFixed(2)} diff=${diff.toFixed(2)}`;
           this.setMoveInput(null);
           return;
         }
       }
     }
+    this.waitInfo = null;
 
     const dx = target.x - this.thief.x;
     const dy = target.y - this.thief.y;
@@ -425,6 +429,8 @@ export class Game {
       test: this.testMode,
       testDone: this.testDone,
       testOutcome: this.testOutcome,
+      waypoint: this.autopilot ? this.autopilot.index : -1,
+      wait: this.waitInfo || '',
       restarted: this.restarted,
     });
   }
