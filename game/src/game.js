@@ -34,6 +34,8 @@ export class Game {
     this.testDone = false;
     this.testOutcome = null;
     this.waitInfo = null;
+    this.fleeTarget = null;
+    this.fleeSteps = 0;
     this.restarted = false;
     this.autopilot = null;
     this.shotMode = false;
@@ -295,6 +297,8 @@ export class Game {
   beginTest(mode) {
     this.testMode = mode;
     this.smokeUsedAtVault = false;
+    this.fleeTarget = null;
+    this.fleeSteps = 0;
     this.restart();
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall:
@@ -348,6 +352,56 @@ export class Game {
     const target = plan.waypoints[plan.index];
     if (!target) return;
 
+    // Threat response comes FIRST: never wait at a gate or stand cracking
+    // the vault while a guard is on the thief. Smoke hides the thief, so
+    // proximity alone is no threat while the thief stands inside a cloud.
+    const inSmoke = this.smokes.some(
+      (smoke) => Math.hypot(this.thief.x - smoke.x, this.thief.y - smoke.y) < smoke.radius,
+    );
+    let threat = null;
+    for (const guard of this.guards) {
+      const dx = this.thief.x - guard.x;
+      const dy = this.thief.y - guard.y;
+      const dist = Math.hypot(dx, dy);
+      const toThief = Math.atan2(dy, dx);
+      let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
+      if (diff > Math.PI) diff = Math.PI * 2 - diff;
+      const sees = guard.canSeeThief(this.thief, this.level.solids, this.smokes);
+      if (sees || (!inSmoke && (dist < 90 || (dist < 200 && diff < 1.0)))) {
+        threat = guard;
+        break;
+      }
+    }
+    if (threat && !this.fleeTarget) {
+      this.fleeSteps = 2;
+      this.fleeTarget = plan.waypoints[Math.max(0, plan.index - this.fleeSteps)];
+    }
+    if (this.fleeTarget) {
+      const fdx = this.fleeTarget.x - this.thief.x;
+      const fdy = this.fleeTarget.y - this.thief.y;
+      if (Math.hypot(fdx, fdy) < 14) {
+        if (threat) {
+          // Still hunted on arrival: fall further back along the route.
+          this.fleeSteps += 2;
+          this.fleeTarget = plan.waypoints[Math.max(0, plan.index - this.fleeSteps)];
+        } else {
+          this.fleeTarget = null;
+          this.fleeSteps = 0;
+        }
+      }
+      if (this.fleeTarget) {
+        this.input.left = fdx < -4;
+        this.input.right = fdx > 4;
+        this.input.up = fdy < -4;
+        this.input.down = fdy > 4;
+        this.input.sneak = false;
+        this.input.interact = false;
+        this.input.clickTarget = null;
+        this.waitInfo = `flee:${threat ? threat.name : '?'}`;
+        return;
+      }
+    }
+
     // Gate: do not enter the vault room until Mara is on the office south
     // row, well away from the vault: the thief then has her whole return
     // north to crack the vault and slip back through the door gap.
@@ -374,32 +428,6 @@ export class Game {
       this.input.interact = true;
       this.waitInfo = 'cracking';
       return;
-    }
-
-    // Threat: a guard that sees the thief, is close enough to touch, or is
-    // close with its cone turned toward the thief, is retreated from at
-    // walk speed (faster than a chasing guard); freezing inside a cone is
-    // what gets a thief caught.
-    for (const guard of this.guards) {
-      const dx = this.thief.x - guard.x;
-      const dy = this.thief.y - guard.y;
-      const dist = Math.hypot(dx, dy);
-      const toThief = Math.atan2(dy, dx);
-      let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
-      if (diff > Math.PI) diff = Math.PI * 2 - diff;
-      const sees = guard.canSeeThief(this.thief, this.level.solids, this.smokes);
-      if (sees || dist < 90 || (dist < 200 && diff < 1.0)) {
-        const len = Math.hypot(dx, dy) || 1;
-        this.input.left = dx / len < -0.3;
-        this.input.right = dx / len > 0.3;
-        this.input.up = dy / len < -0.3;
-        this.input.down = dy / len > 0.3;
-        this.input.sneak = false;
-        this.input.interact = false;
-        this.input.clickTarget = null;
-        this.waitInfo = `retreat:${guard.name}@${Math.round(dist)}`;
-        return;
-      }
     }
 
     // Wait out a guard whose cone is turned toward the thief, but only
