@@ -78,11 +78,21 @@ export function buildLevel() {
     },
     {
       name: 'MARA',
+      // Out-and-back loop through the Vault/Office door gap (x 1060..1120 at
+      // y 384): a straight north-south patrol would walk into that wall.
       waypoints: [
-        { x: 980, y: 150 },
+        { x: 1000, y: 150 },
         { x: 1220, y: 150 },
-        { x: 1220, y: 620 },
-        { x: 980, y: 620 },
+        { x: 1220, y: 320 },
+        { x: 1090, y: 360 },
+        { x: 1160, y: 430 },
+        { x: 1180, y: 560 },
+        { x: 1000, y: 560 },
+        { x: 1180, y: 560 },
+        { x: 1160, y: 430 },
+        { x: 1090, y: 360 },
+        { x: 1220, y: 320 },
+        { x: 1220, y: 150 },
       ],
       speed: 50,
     },
