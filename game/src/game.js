@@ -569,15 +569,22 @@ export class Game {
     }
 
     // North-door gate: do not step through the east divider's north door
-    // into the vault room while Mara is north. The thief waits at
-    // (900, 230) in the gallery, behind the wall from her and 30px south
-    // of Rocco's north leg (his cone never points there), until she is
-    // south in the office (y > 400). She then needs ~8s to walk back
-    // north to the vault, and the thief is in and out in ~4.5s.
-    if (plan.index === 5 && Math.hypot(this.thief.x - 900, this.thief.y - 230) < 30) {
+    // into the vault room while Mara is north OR Rocco can see the door.
+    // The thief waits at (900, 300) — out of cam 1's range, south of
+    // Rocco's north-leg cone, and west of the divider from Mara — until
+    // Mara is south in the office (y > 400) AND Rocco is far from the
+    // door (west on the north leg, x < 600, or south on the east leg,
+    // y > 450). Waiting at the door itself (900, 230) was a trap: Rocco
+    // rounding the north-east corner saw the thief there while it waited
+    // for Mara, chased it into the vault room, and caught it as it fled
+    // back west through the door. She then needs ~8s to walk back north
+    // to the vault, and the thief is in and out in ~4.5s.
+    if (plan.index === 5 && Math.hypot(this.thief.x - 900, this.thief.y - 300) < 30) {
       const mara = this.guards[1];
-      if (mara.y <= 400) {
-        this.waitInfo = 'northdoor:mara';
+      const rocco = this.guards[0];
+      const roccoClear = rocco.x < 600 || rocco.y > 450;
+      if (mara.y <= 400 || !roccoClear) {
+        this.waitInfo = 'northdoor:' + (mara.y <= 400 ? 'mara' : 'rocco');
         this.setMoveInput(null);
         return;
       }
