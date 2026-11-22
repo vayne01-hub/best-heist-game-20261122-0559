@@ -310,6 +310,9 @@ export class Game {
     this.hiding = false;
     this.hideMode = null;
     this.hideResumeIndex = null;
+    this._stallTime = 0;
+    this._stallSidestep = 0;
+    this._stallLast = null;
     this.restart();
     if (mode === 'win') {
       // Routed through the door gaps, never straight through a wall.
@@ -326,13 +329,17 @@ export class Game {
           { x: 200, y: 300 },
           { x: 200, y: 210 },
           { x: 400, y: 210 },
-          // Across the gallery at y 350, not y 230: cam 1 (640, 76,
+          // Across the gallery at y 400, not y 230: cam 1 (640, 76,
           // range 270) watches the whole north strip, and the thief
           // crossing at y 230 collected +30 alarm from it alone. At
-          // y 350 the thief is out of cam 1's range and south of
-          // Rocco's north leg, where his cone never points.
-          { x: 400, y: 350 },
-          { x: 900, y: 350 },
+          // y 400 the thief is out of cam 1's range and south of
+          // Rocco's north leg, where his cone never points. (y 350
+          // looked right too, but it runs straight into the statue at
+          // (600, 330, 46, 46): the thief pushed east into its west
+          // face with no vertical input and stalled there for the whole
+          // run. y 400 passes 24px south of the statue, clear.)
+          { x: 400, y: 400 },
+          { x: 900, y: 400 },
           { x: 900, y: 230 },
           { x: 928, y: 230 },
           { x: 1000, y: 230 },
@@ -340,8 +347,8 @@ export class Game {
           { x: 1000, y: 230 },
           { x: 928, y: 230 },
           { x: 900, y: 230 },
-          { x: 900, y: 350 },
-          { x: 400, y: 350 },
+          { x: 900, y: 400 },
+          { x: 400, y: 400 },
           { x: 400, y: 210 },
           { x: 200, y: 210 },
           { x: 200, y: 300 },
@@ -358,11 +365,65 @@ export class Game {
     }
   }
 
+  // True when a point (with the thief's 13px radius) would be inside a
+  // solid: used by the stall detector to pick an open sidestep direction.
+  _pointBlocked(x, y) {
+    const r = 13;
+    for (const s of this.level.solids) {
+      if (x > s.x - r && x < s.x + s.w + r && y > s.y - r && y < s.y + s.h + r) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   runAutopilot(dt) {
     const plan = this.autopilot;
     if (!plan || this.state !== 'playing') return;
     const target = plan.waypoints[plan.index];
     if (!target) return;
+
+    // Stall detector: if the thief has a movement input but has not moved
+    // for 1.5s, it is wedged against furniture (a waypoint leg that runs
+    // head-on into a solid with no sliding component, so it never slides
+    // around it). Sidestep perpendicular to the route for 1.2s to walk
+    // around the obstacle, then resume the route.
+    if (this._stallSidestep > 0) {
+      this._stallSidestep -= dt;
+      const dx = target.x - this.thief.x;
+      const dy = target.y - this.thief.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      let px = -dy / dist;
+      let py = dx / dist;
+      if (this._pointBlocked(this.thief.x + px * 40, this.thief.y + py * 40)) {
+        px = -px;
+        py = -py;
+      }
+      this.input.left = px < -0.3;
+      this.input.right = px > 0.3;
+      this.input.up = py < -0.3;
+      this.input.down = py > 0.3;
+      this.input.sneak = false;
+      this.input.interact = false;
+      this.input.clickTarget = null;
+      this.waitInfo = 'unstick';
+      return;
+    }
+    const moved = this._stallLast
+      ? Math.hypot(this.thief.x - this._stallLast.x, this.thief.y - this._stallLast.y)
+      : 1;
+    const hadMoveInput =
+      this.input.left || this.input.right || this.input.up || this.input.down;
+    if (moved < 1 && hadMoveInput) {
+      this._stallTime = (this._stallTime || 0) + dt;
+      if (this._stallTime > 1.5) {
+        this._stallSidestep = 1.2;
+        this._stallTime = 0;
+      }
+    } else {
+      this._stallTime = 0;
+    }
+    this._stallLast = { x: this.thief.x, y: this.thief.y };
 
     // Threat response comes FIRST: never wait at a gate or stand cracking
     // the vault while a guard is on the thief. (Smoke hides the thief, so
