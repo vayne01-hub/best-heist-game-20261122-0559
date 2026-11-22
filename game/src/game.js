@@ -149,10 +149,16 @@ export class Game {
     if (seenByGuard) this.alarm.add(16 * dt, 'guard sight');
     if (seenByCamera) this.alarm.add(24 * dt, 'camera sight');
     if (!seenByGuard && !seenByCamera) this.alarm.drain(3 * dt);
-    // Loud footsteps near a guard raise the alarm a little.
+    // Loud footsteps near a guard raise the alarm a little, but only
+    // when the guard has a clear line to the thief: footsteps through a
+    // solid wall are not heard, and a wall-wedged guard used to keep the
+    // meter climbing while the thief stood on the far side of it.
     if (this.thief.moving && !this.thief.sneaking) {
       for (const guard of this.guards) {
-        if (Math.hypot(guard.x - this.thief.x, guard.y - this.thief.y) < 180) {
+        if (
+          Math.hypot(guard.x - this.thief.x, guard.y - this.thief.y) < 180 &&
+          hasLineOfSight(guard.x, guard.y, this.thief.x, this.thief.y, this.level.solids, this.smokes)
+        ) {
           this.alarm.add(4 * dt, 'footsteps');
           break;
         }
@@ -312,7 +318,12 @@ export class Game {
           { x: 320, y: 520 },
           { x: 500, y: 620 },
           { x: 860, y: 620 },
-          { x: 933, y: 510 },
+          // Through the east divider's south door gap (y 480..540) dead
+          // centre: a beeline from the gallery row to the office row cuts
+          // the gap's corner and wedges the thief on the wall, so the
+          // route steps through the gap itself, both ways.
+          { x: 920, y: 510 },
+          { x: 940, y: 510 },
           { x: 1000, y: 560 },
           { x: 1200, y: 560 },
           { x: 1250, y: 560, gate: 'vaultClear' },
@@ -325,7 +336,8 @@ export class Game {
           { x: 1200, y: 420 },
           { x: 1200, y: 560 },
           { x: 1000, y: 560 },
-          { x: 933, y: 510 },
+          { x: 940, y: 510 },
+          { x: 920, y: 510 },
           { x: 860, y: 620 },
           { x: 500, y: 620 },
           { x: 320, y: 520 },
@@ -482,12 +494,15 @@ export class Game {
       return;
     }
     // The driver walks everywhere: it outruns a chasing guard (150 vs 108)
-    // and the vault round trip fits inside Mara's return north.
+    // and the vault round trip fits inside Mara's return north. East of
+    // the divider (the Vault and Office, Mara's ground) it sneaks: her
+    // view range drops to 150 and the thief makes no footstep noise, so
+    // crossing her patrol is far less likely to be seen or heard.
     this.input.left = dx < -4;
     this.input.right = dx > 4;
     this.input.up = dy < -4;
     this.input.down = dy > 4;
-    this.input.sneak = false;
+    this.input.sneak = this.thief.x > 928;
     this.input.interact = Boolean(this.thief.nearestLoot(this.level));
     this.input.clickTarget = null;
   }
