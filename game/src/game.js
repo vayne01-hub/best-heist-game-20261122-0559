@@ -545,6 +545,24 @@ export class Game {
       }
     }
 
+    // Climb gate: do not climb the east side (900, 400) -> (900, 230)
+    // while Rocco is at the top of his east leg (x > 840, y < 400). He
+    // walks south down that leg facing south, and his cone covers the
+    // whole climb: a thief at (900, 300) is south-east of him, in the
+    // cone, and the chase that follows runs the thief down in the open
+    // gallery (it fled west along y 400 and Rocco chased it in a
+    // straight line, alarm 18 -> 91). Wait at (900, 400) until he is
+    // south of the climb start (y > 400, where the thief is north of
+    // him and out of his south-facing cone) or off the east leg.
+    if (plan.index === 5 && Math.hypot(this.thief.x - 900, this.thief.y - 400) < 30) {
+      const rocco = this.guards[0];
+      if (rocco.x > 840 && rocco.y < 400) {
+        this.waitInfo = 'climb:rocco';
+        this.setMoveInput(null);
+        return;
+      }
+    }
+
     // North-door gate: do not step through the east divider's north door
     // into the vault room while Mara is north. The thief waits at
     // (900, 230) in the gallery, behind the wall from her and 30px south
