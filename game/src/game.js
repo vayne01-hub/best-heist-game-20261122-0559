@@ -410,8 +410,14 @@ export class Game {
 
     // Gate: do not enter the vault room until Mara is on the office south
     // row, well away from the vault: the thief then has her whole return
-    // north to crack the vault and slip back through the door gap.
-    if (target.gate === 'vaultClear') {
+    // north to crack the vault and slip back through the door gap. The
+    // gate only holds the thief once it REACHES the wait spot (the office
+    // south-east corner, clear of Mara's route): freezing mid-office
+    // while Mara patrols past is what got the thief caught.
+    if (
+      target.gate === 'vaultClear' &&
+      Math.hypot(target.x - this.thief.x, target.y - this.thief.y) < 14
+    ) {
       const mara = this.guards[1];
       const nearVault = Math.hypot(mara.x - 1150, mara.y - 180) < 300;
       if (nearVault || mara.y <= 500) {
@@ -423,7 +429,9 @@ export class Game {
 
     // Stand still on the vault until it is cracked: advancing the waypoint
     // early would walk away mid-channel and the crack would never finish.
-    if (target.vault && !this.vaultTaken) {
+    // (Only once the thief is actually at the vault: freezing on the way
+    // there strands it in Mara's patrol.)
+    if (target.vault && !this.vaultTaken && Math.hypot(this.thief.x - 1150, this.thief.y - 180) < 50) {
       const mara = this.guards[1];
       const maraDist = Math.hypot(mara.x - this.thief.x, mara.y - this.thief.y);
       if (maraDist < 320 && this.thief.smokeCharges > 0 && !this.smokeUsedAtVault) {
