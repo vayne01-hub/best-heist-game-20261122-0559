@@ -327,13 +327,15 @@ export class Game {
           { x: 1000, y: 560 },
           { x: 1200, y: 560 },
           { x: 1250, y: 560, gate: 'vaultClear' },
-          { x: 1200, y: 420 },
-          { x: 1090, y: 420 },
-          { x: 1090, y: 350 },
+          // Straight north up the office east edge to the vault: the old
+          // diagonal to (1200, 420) crossed Mara's south leg head-on
+          // (her patrol runs x 1180, the thief's leg x 1200, 20px apart).
+          // The vault approach runs at x 1250, clear of her route, and
+          // the gate below gives the thief her whole return north.
+          { x: 1250, y: 150 },
           { x: 1150, y: 180, vault: true },
-          { x: 1090, y: 350 },
-          { x: 1090, y: 420 },
-          { x: 1200, y: 420 },
+          { x: 1250, y: 150 },
+          { x: 1250, y: 560 },
           { x: 1200, y: 560 },
           { x: 1000, y: 560 },
           { x: 940, y: 510 },
@@ -429,6 +431,21 @@ export class Game {
       }
     }
 
+    // Door gate: do not step through the east divider's south door into
+    // the Office while Mara is near it. The thief waits at the gallery
+    // row (860, 620), where the wall hides it from her, until she has
+    // walked north past the door. Without this the thief re-entered the
+    // office straight into her chase, and the two wedged each other at
+    // the door corner while the alarm climbed.
+    if (plan.index === 6 && Math.hypot(this.thief.x - 860, this.thief.y - 620) < 30) {
+      const mara = this.guards[1];
+      if (Math.hypot(mara.x - 928, mara.y - 510) < 300) {
+        this.waitInfo = `door:mara@(${Math.round(mara.x)},${Math.round(mara.y)})`;
+        this.setMoveInput(null);
+        return;
+      }
+    }
+
     // Gate: do not enter the vault room until Mara is on the office south
     // row, well away from the vault: the thief then has her whole return
     // north to crack the vault and slip back through the door gap. The
@@ -453,9 +470,10 @@ export class Game {
     // (Only once the thief is actually at the vault: freezing on the way
     // there strands it in Mara's patrol.)
     if (target.vault && !this.vaultTaken && Math.hypot(this.thief.x - 1150, this.thief.y - 180) < 50) {
-      const mara = this.guards[1];
-      const maraDist = Math.hypot(mara.x - this.thief.x, mara.y - this.thief.y);
-      if (maraDist < 320 && this.thief.smokeCharges > 0 && !this.smokeUsedAtVault) {
+      // Always throw smoke before cracking: the cloud hides the thief
+      // from Mara and from cam 2 (bolted 110px east of the vault) for
+      // the whole 1.5s channel, so the crack itself never gets seen.
+      if (this.thief.smokeCharges > 0 && !this.smokeUsedAtVault) {
         this.throwSmoke();
         this.smokeUsedAtVault = true;
       }
@@ -502,7 +520,7 @@ export class Game {
     this.input.right = dx > 4;
     this.input.up = dy < -4;
     this.input.down = dy > 4;
-    this.input.sneak = this.thief.x > 928;
+    this.input.sneak = this.thief.x > 928 && this.thief.y > 350;
     this.input.interact = Boolean(this.thief.nearestLoot(this.level));
     this.input.clickTarget = null;
   }
