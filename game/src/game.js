@@ -546,17 +546,21 @@ export class Game {
     }
 
     // Climb gate: do not climb the east side (900, 400) -> (900, 230)
-    // while Rocco is at the top of his east leg (x > 840, y < 400). He
-    // walks south down that leg facing south, and his cone covers the
-    // whole climb: a thief at (900, 300) is south-east of him, in the
-    // cone, and the chase that follows runs the thief down in the open
+    // while Rocco is near the top of his east leg. He walks south down
+    // that leg facing south, and his cone covers the whole climb: a
+    // thief mid-climb at (900, 300) is south-east of him, in the cone,
+    // and the chase that follows runs the thief down in the open
     // gallery (it fled west along y 400 and Rocco chased it in a
-    // straight line, alarm 18 -> 91). Wait at (900, 400) until he is
-    // south of the climb start (y > 400, where the thief is north of
-    // him and out of his south-facing cone) or off the east leg.
+    // straight line, alarm 18 -> 91). The gate must look ahead, not
+    // just at where Rocco is now: the thief starts climbing while Rocco
+    // is still on the north leg at x 817, and Rocco turns south onto
+    // the east leg mid-climb. So wait at (900, 400) until Rocco is
+    // clearly elsewhere: west on the north leg (x < 700) or south on
+    // the east leg (y > 450, where the thief is north of him and out
+    // of his south-facing cone).
     if (plan.index === 5 && Math.hypot(this.thief.x - 900, this.thief.y - 400) < 30) {
       const rocco = this.guards[0];
-      if (rocco.x > 840 && rocco.y < 400) {
+      if (!(rocco.x < 700 || rocco.y > 450)) {
         this.waitInfo = 'climb:rocco';
         this.setMoveInput(null);
         return;
