@@ -381,11 +381,14 @@ export class Game {
       // Line of sight matters: a guard on the far side of a wall is no
       // threat, and fleeing from one runs the thief into the real danger.
       const clearShot = hasLineOfSight(guard.x, guard.y, this.thief.x, this.thief.y, this.level.solids, this.smokes);
-      // Proximity only counts at very close range: a guard 150px away
-      // facing the thief's general direction cannot see it (outside the
-      // vision cone) and is no threat, yet fleeing from it ran the thief
-      // straight into the guard's path along the office south row.
-      if (sees || (clearShot && (dist < 45 || (dist < 60 && diff < 1.0)))) {
+      // Proximity only counts at very close range, and only when the
+      // guard is actually facing the thief: a guard 150px away facing
+      // the thief's general direction cannot see it (outside the vision
+      // cone) and is no threat, yet fleeing from it ran the thief
+      // straight into the guard's path along the office south row. A
+      // guard walking past 20px away, facing away, is no threat either:
+      // the old unconditional close-range clause fled from those too.
+      if (sees || (clearShot && dist < 60 && diff < 1.0)) {
         threat = guard;
         break;
       }
@@ -432,18 +435,31 @@ export class Game {
     }
 
     // Door gate: do not step through the east divider's south door into
-    // the Office while Mara is near it. The thief waits at the gallery
-    // row (860, 620), where the wall hides it from her, until she has
-    // walked north past the door. Without this the thief re-entered the
-    // office straight into her chase, and the two wedged each other at
-    // the door corner while the alarm climbed.
-    if (plan.index === 6 && Math.hypot(this.thief.x - 860, this.thief.y - 620) < 30) {
+    // the Office while Mara is near it or Rocco is near it on the gallery
+    // side. The thief waits on the gallery south row, where the wall
+    // hides it from Mara and Rocco's patrol passes it facing away, until
+    // both guards are clear of the door. Without this the thief
+    // re-entered the office straight into a chase, and the two wedged
+    // each other at the door corner while the alarm climbed. Two hold
+    // spots: (500, 620) on the way in, and (860, 620) when it has just
+    // fled back out of the office.
+    const doorClear = () => {
       const mara = this.guards[1];
-      if (Math.hypot(mara.x - 928, mara.y - 510) < 300) {
-        this.waitInfo = `door:mara@(${Math.round(mara.x)},${Math.round(mara.y)})`;
-        this.setMoveInput(null);
-        return;
-      }
+      const rocco = this.guards[0];
+      return (
+        Math.hypot(mara.x - 928, mara.y - 510) >= 300 &&
+        Math.hypot(rocco.x - 928, rocco.y - 510) >= 300
+      );
+    };
+    if (plan.index === 5 && Math.hypot(this.thief.x - 500, this.thief.y - 620) < 30 && !doorClear()) {
+      this.waitInfo = 'door:wait';
+      this.setMoveInput(null);
+      return;
+    }
+    if (plan.index === 6 && Math.hypot(this.thief.x - 860, this.thief.y - 620) < 30 && !doorClear()) {
+      this.waitInfo = 'door:wait';
+      this.setMoveInput(null);
+      return;
     }
 
     // Gate: do not enter the vault room until Mara is on the office south
@@ -558,6 +574,8 @@ export class Game {
       test: this.testMode,
       testDone: this.testDone,
       testOutcome: this.testOutcome,
+      loseReason: this.loseReason,
+      fleeIndex: this.fleeIndex,
       waypoint: this.autopilot ? this.autopilot.index : -1,
       wait: this.waitInfo || '',
       restarted: this.restarted,
