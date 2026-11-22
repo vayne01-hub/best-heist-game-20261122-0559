@@ -407,7 +407,7 @@ export class Game {
       // wall, whose door gap the straight line missed.)
       this.fleeIndex = Math.max(0, plan.index - 1);
     }
-    // Hiding: the thief ran to the Storage hide (150, 650), deep in the
+    // Hiding: the thief ran to the Storage hide (150, 680), deep in the
     // Storage where the west divider wall breaks every guard's line of
     // sight. A chase-hide ends when the threat clears and the route
     // resumes from waypoint 1. A Rocco-hide ends when Rocco has left the
@@ -420,7 +420,10 @@ export class Game {
       // into the wall's south segment and stalls there, in Rocco's cone.
       // So the hide is two steps: the Storage door waypoint (320, 520)
       // while east of the wall, then the hide itself once through it.
-      const hide = this.thief.x > 362 ? { x: 320, y: 520 } : { x: 150, y: 650 };
+      // The hide sits south of the Storage crates (150, 680) so the
+      // beeline to it always has a southward component and slides around
+      // them instead of stalling against one's east face.
+      const hide = this.thief.x > 362 ? { x: 320, y: 520 } : { x: 150, y: 680 };
       const hdx = hide.x - this.thief.x;
       const hdy = hide.y - this.thief.y;
       const hideDone =
@@ -573,15 +576,14 @@ export class Game {
       return;
     }
     // The driver walks everywhere: it outruns a chasing guard (150 vs 108)
-    // and the vault round trip fits inside Mara's return north. East of
-    // the divider (the Vault and Office, Mara's ground) it sneaks: her
-    // view range drops to 150 and the thief makes no footstep noise, so
-    // crossing her patrol is far less likely to be seen or heard.
+    // and the vault round trip fits inside Mara's return north. Sneaking
+    // (72) is slower and the vault run is a timing window, so the driver
+    // walks the whole route and relies on the door gates for safety.
     this.input.left = dx < -4;
     this.input.right = dx > 4;
     this.input.up = dy < -4;
     this.input.down = dy > 4;
-    this.input.sneak = this.thief.x > 928 && this.thief.y > 350;
+    this.input.sneak = false;
     this.input.interact = Boolean(this.thief.nearestLoot(this.level));
     this.input.clickTarget = null;
   }
