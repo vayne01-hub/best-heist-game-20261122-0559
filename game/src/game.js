@@ -414,18 +414,28 @@ export class Game {
     // gallery south leg, and the route resumes from waypoint 3 (the
     // Storage door), the only safe way back onto the gallery south row.
     if (this.hiding) {
-      const hide = { x: 150, y: 650 };
+      // The hide is deep in the Storage (150, 650), but a thief east of
+      // the west divider must cross that wall through its south door gap
+      // first: a beeline to the hide from the gallery side runs straight
+      // into the wall's south segment and stalls there, in Rocco's cone.
+      // So the hide is two steps: the Storage door waypoint (320, 520)
+      // while east of the wall, then the hide itself once through it.
+      const hide = this.thief.x > 362 ? { x: 320, y: 520 } : { x: 150, y: 650 };
       const hdx = hide.x - this.thief.x;
       const hdy = hide.y - this.thief.y;
       const hideDone =
         this.hideMode === 'rocco' ? this.guards[0].y < 500 && !threat : !threat;
+      // Only rest once actually at the hide, west of the wall: the
+      // intermediate step (320, 520) is visible to Rocco through the
+      // west door gap, so the thief must not linger there.
+      const atHide = this.thief.x <= 362 && Math.hypot(hdx, hdy) < 14;
       if (hideDone) {
         this.hiding = false;
         this.fleeIndex = null;
         plan.index = this.hideResumeIndex;
         this.hideResumeIndex = null;
         this.hideMode = null;
-      } else if (Math.hypot(hdx, hdy) < 14) {
+      } else if (atHide) {
         this.setMoveInput(null);
         this.waitInfo = `hide:${threat ? threat.name : this.hideMode}`;
         return;
