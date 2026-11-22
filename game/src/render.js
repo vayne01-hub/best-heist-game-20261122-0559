@@ -122,7 +122,24 @@ function drawFurniture(ctx, level) {
 
 function drawLoot(ctx, level, time) {
   for (const item of level.loot) {
-    if (item.taken) continue;
+    if (item.taken) {
+      if (item.kind === 'vault') {
+        // The cracked vault stays on screen as an open, emptied safe.
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(item.x - 52, item.y - 40, 104, 80);
+        ctx.strokeStyle = '#78909c';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(item.x - 52, item.y - 40, 104, 80);
+        ctx.fillStyle = '#0d0f16';
+        ctx.fillRect(item.x - 40, item.y - 28, 80, 56);
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = '700 12px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('VAULT — CRACKED', item.x, item.y + 48);
+      }
+      continue;
+    }
     const pulse = 0.5 + 0.5 * Math.sin(time * 3 + item.x);
     if (item.kind === 'vault') {
       const glow = ctx.createRadialGradient(item.x, item.y, 10, item.x, item.y, 110);
@@ -434,8 +451,8 @@ export function drawGame(ctx, game) {
     ctx.fillStyle = '#ff8a80';
     ctx.font = '900 30px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('SPOTTED!', STAGE_WIDTH / 2, HUD_HEIGHT + 14);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('SPOTTED!', STAGE_WIDTH / 2, STAGE_HEIGHT - 12);
   }
 
   drawHud(ctx, game);

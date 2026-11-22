@@ -32,6 +32,7 @@ export class Game {
     this.errors = [];
     this.testMode = null;
     this.testDone = false;
+    this.testOutcome = null;
     this.restarted = false;
     this.autopilot = null;
     this.shotMode = false;
@@ -294,24 +295,37 @@ export class Game {
     this.testMode = mode;
     this.restart();
     if (mode === 'win') {
+      // Routed through the door gaps, never straight through a wall:
+      // south door out of the Entry Hall, south row across the Gallery,
+      // south door into the Office, around the desk, north door to the Vault.
       this.autopilot = {
         waypoints: [
           { x: 200, y: 300 },
-          { x: 357, y: 550 },
+          { x: 180, y: 370 },
+          { x: 180, y: 420 },
+          { x: 320, y: 520 },
           { x: 500, y: 620 },
           { x: 860, y: 620 },
           { x: 933, y: 510 },
-          { x: 1050, y: 520 },
+          { x: 1000, y: 560 },
+          { x: 1090, y: 560 },
+          { x: 1200, y: 560 },
+          { x: 1200, y: 420 },
           { x: 1090, y: 420, gate: 'vaultClear' },
           { x: 1090, y: 350 },
           { x: 1150, y: 180 },
           { x: 1090, y: 350 },
           { x: 1090, y: 420 },
-          { x: 1050, y: 520 },
+          { x: 1200, y: 420 },
+          { x: 1200, y: 560 },
+          { x: 1090, y: 560 },
+          { x: 1000, y: 560 },
           { x: 933, y: 510 },
           { x: 860, y: 620 },
           { x: 500, y: 620 },
-          { x: 357, y: 550 },
+          { x: 320, y: 520 },
+          { x: 180, y: 420 },
+          { x: 180, y: 370 },
           { x: 200, y: 300 },
           { x: 32, y: 300 },
         ],
@@ -387,6 +401,7 @@ export class Game {
   }
 
   finishTest() {
+    this.testOutcome = this.state;
     this.testDone = true;
     // Prove restart works: reset to a fresh playing run and report it.
     this.restart();
@@ -409,6 +424,7 @@ export class Game {
       errors: this.errors,
       test: this.testMode,
       testDone: this.testDone,
+      testOutcome: this.testOutcome,
       restarted: this.restarted,
     });
   }

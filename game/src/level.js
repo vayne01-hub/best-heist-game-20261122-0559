@@ -59,7 +59,7 @@ export function buildLevel() {
     { id: 'vault', kind: 'vault', label: 'THE MIDNIGHT VAULT', x: 1180, y: 150, value: 50000, channelSeconds: 1.5, taken: false },
     { id: 'painting', kind: 'painting', label: 'GILDED PORTRAIT', x: 640, y: 96, value: 8000, channelSeconds: 0, taken: false },
     { id: 'vase', kind: 'vase', label: 'JADE VASE', x: 1080, y: 480, value: 5000, channelSeconds: 0, taken: false },
-    { id: 'necklace', kind: 'necklace', label: 'PEARL NECKLACE', x: 155, y: 525, value: 6000, channelSeconds: 0, taken: false },
+    { id: 'necklace', kind: 'necklace', label: 'PEARL NECKLACE', x: 250, y: 540, value: 6000, channelSeconds: 0, taken: false },
   ];
 
   const spawn = { x: 48, y: 300 };
