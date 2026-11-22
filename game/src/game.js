@@ -3,6 +3,7 @@
 // autopilot the maker uses to prove the game can be won, lost and restarted.
 
 import { buildLevel, roomAt } from './level.js';
+import { hasLineOfSight } from './vision.js';
 import { Thief } from './thief.js';
 import { Guard } from './guard.js';
 import { SecurityCamera } from './camera.js';
@@ -353,11 +354,9 @@ export class Game {
     if (!target) return;
 
     // Threat response comes FIRST: never wait at a gate or stand cracking
-    // the vault while a guard is on the thief. Smoke hides the thief, so
-    // proximity alone is no threat while the thief stands inside a cloud.
-    const inSmoke = this.smokes.some(
-      (smoke) => Math.hypot(this.thief.x - smoke.x, this.thief.y - smoke.y) < smoke.radius,
-    );
+    // the vault while a guard is on the thief. (Smoke hides the thief, so
+    // a guard whose line of sight crosses a cloud is no threat at all:
+    // hasLineOfSight below already accounts for smoke.)
     let threat = null;
     for (const guard of this.guards) {
       const dx = this.thief.x - guard.x;
@@ -367,7 +366,10 @@ export class Game {
       let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
       if (diff > Math.PI) diff = Math.PI * 2 - diff;
       const sees = guard.canSeeThief(this.thief, this.level.solids, this.smokes);
-      if (sees || (!inSmoke && (dist < 90 || (dist < 200 && diff < 1.0)))) {
+      // Line of sight matters: a guard on the far side of a wall is no
+      // threat, and fleeing from one runs the thief into the real danger.
+      const clearShot = hasLineOfSight(guard.x, guard.y, this.thief.x, this.thief.y, this.level.solids, this.smokes);
+      if (sees || (clearShot && (dist < 45 || (dist < 200 && diff < 1.0)))) {
         threat = guard;
         break;
       }
@@ -435,12 +437,13 @@ export class Game {
     }
 
     // Wait out a guard whose cone is turned toward the thief, but only
-    // while the thief is unseen: waiting inside a cone gets you caught.
+    // while the thief is unseen and the guard has a clear line to it:
+    // waiting out a guard on the far side of a wall wastes the run.
     for (const guard of this.guards) {
       const dx = this.thief.x - guard.x;
       const dy = this.thief.y - guard.y;
       const dist = Math.hypot(dx, dy);
-      if (dist < 230) {
+      if (dist < 230 && hasLineOfSight(guard.x, guard.y, this.thief.x, this.thief.y, this.level.solids, this.smokes)) {
         const toThief = Math.atan2(dy, dx);
         let diff = Math.abs(toThief - guard.angle) % (Math.PI * 2);
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
