@@ -326,12 +326,22 @@ export class Game {
           { x: 200, y: 300 },
           { x: 200, y: 210 },
           { x: 400, y: 210 },
+          // Across the gallery at y 350, not y 230: cam 1 (640, 76,
+          // range 270) watches the whole north strip, and the thief
+          // crossing at y 230 collected +30 alarm from it alone. At
+          // y 350 the thief is out of cam 1's range and south of
+          // Rocco's north leg, where his cone never points.
+          { x: 400, y: 350 },
+          { x: 900, y: 350 },
           { x: 900, y: 230 },
           { x: 928, y: 230 },
           { x: 1000, y: 230 },
           { x: 1150, y: 180, vault: true },
           { x: 1000, y: 230 },
           { x: 928, y: 230 },
+          { x: 900, y: 230 },
+          { x: 900, y: 350 },
+          { x: 400, y: 350 },
           { x: 400, y: 210 },
           { x: 200, y: 210 },
           { x: 200, y: 300 },
@@ -480,7 +490,7 @@ export class Game {
     // of Rocco's north leg (his cone never points there), until she is
     // south in the office (y > 400). She then needs ~8s to walk back
     // north to the vault, and the thief is in and out in ~4.5s.
-    if (plan.index === 4 && Math.hypot(this.thief.x - 900, this.thief.y - 230) < 30) {
+    if (plan.index === 5 && Math.hypot(this.thief.x - 900, this.thief.y - 230) < 30) {
       const mara = this.guards[1];
       if (mara.y <= 400) {
         this.waitInfo = 'northdoor:mara';
@@ -498,9 +508,12 @@ export class Game {
 
     // Stand still on the vault until it is cracked: advancing the waypoint
     // early would walk away mid-channel and the crack would never finish.
-    // (Only once the thief is actually at the vault: freezing on the way
-    // there strands it in Mara's patrol.)
-    if (target.vault && !this.vaultTaken && Math.hypot(this.thief.x - 1150, this.thief.y - 180) < 50) {
+    // The thief must be within the loot's own 52px grab range of the
+    // vault itself (1180, 150), not merely near the route waypoint: the
+    // waypoint is 42px from the vault, so stopping 50px short of it left
+    // the thief 85px from the vault, out of range, and it stood there
+    // holding interact forever while the alarm climbed.
+    if (target.vault && !this.vaultTaken && Math.hypot(this.thief.x - 1180, this.thief.y - 150) < 48) {
       // Always throw smoke before cracking: the cloud hides the thief
       // from Mara and from cam 2 (bolted 110px east of the vault) for
       // the whole 1.5s channel, so the crack itself never gets seen.
