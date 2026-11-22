@@ -367,7 +367,11 @@ export class Game {
       // Line of sight matters: a guard on the far side of a wall is no
       // threat, and fleeing from one runs the thief into the real danger.
       const clearShot = hasLineOfSight(guard.x, guard.y, this.thief.x, this.thief.y, this.level.solids, this.smokes);
-      if (sees || (clearShot && (dist < 45 || (dist < 200 && diff < 1.0)))) {
+      // Proximity only counts at very close range: a guard 150px away
+      // facing the thief's general direction cannot see it (outside the
+      // vision cone) and is no threat, yet fleeing from it ran the thief
+      // straight into the guard's path along the office south row.
+      if (sees || (clearShot && (dist < 45 || (dist < 60 && diff < 1.0)))) {
         threat = guard;
         break;
       }
