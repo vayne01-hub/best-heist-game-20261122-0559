@@ -373,7 +373,11 @@ export class Game {
       }
     }
     if (threat && !this.fleeTarget) {
-      this.fleeSteps = 2;
+      // Fall back one route step at a time: consecutive waypoints are
+      // valid route segments, so the flee path never runs into a wall.
+      // (Falling back two steps at once wedged the thief on the office
+      // wall, whose door gap the straight line missed.)
+      this.fleeSteps = 1;
       this.fleeTarget = plan.waypoints[Math.max(0, plan.index - this.fleeSteps)];
     }
     if (this.fleeTarget) {
@@ -381,8 +385,8 @@ export class Game {
       const fdy = this.fleeTarget.y - this.thief.y;
       if (Math.hypot(fdx, fdy) < 14) {
         if (threat) {
-          // Still hunted on arrival: fall further back along the route.
-          this.fleeSteps += 2;
+          // Still hunted on arrival: fall one more route step back.
+          this.fleeSteps += 1;
           this.fleeTarget = plan.waypoints[Math.max(0, plan.index - this.fleeSteps)];
         } else {
           this.fleeTarget = null;
