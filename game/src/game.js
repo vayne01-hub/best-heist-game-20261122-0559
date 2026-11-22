@@ -3,7 +3,7 @@
 // autopilot the maker uses to prove the game can be won, lost and restarted.
 
 import { buildLevel, roomAt } from './level.js';
-import { hasLineOfSight } from './vision.js';
+import { hasLineOfSight, angleDifference } from './vision.js';
 import { Thief } from './thief.js';
 import { Guard } from './guard.js';
 import { SecurityCamera } from './camera.js';
@@ -322,8 +322,8 @@ export class Game {
           { x: 180, y: 370 },
           { x: 180, y: 420 },
           { x: 320, y: 520 },
-          { x: 500, y: 620 },
-          { x: 860, y: 620 },
+          { x: 500, y: 680 },
+          { x: 860, y: 680 },
           // Through the east divider's south door gap (y 480..540) dead
           // centre: a beeline from the gallery row to the office row cuts
           // the gap's corner and wedges the thief on the wall, so the
@@ -332,7 +332,7 @@ export class Game {
           { x: 940, y: 510 },
           { x: 1000, y: 560 },
           { x: 1200, y: 560 },
-          { x: 1250, y: 560, gate: 'vaultClear' },
+          { x: 1250, y: 560 },
           // Straight north up the office east edge to the vault: the old
           // diagonal to (1200, 420) crossed Mara's south leg head-on
           // (her patrol runs x 1180, the thief's leg x 1200, 20px apart).
@@ -346,8 +346,8 @@ export class Game {
           { x: 1000, y: 560 },
           { x: 940, y: 510 },
           { x: 920, y: 510 },
-          { x: 860, y: 620 },
-          { x: 500, y: 620 },
+          { x: 860, y: 680 },
+          { x: 500, y: 680 },
           { x: 320, y: 520 },
           { x: 180, y: 420 },
           { x: 180, y: 370 },
@@ -483,45 +483,38 @@ export class Game {
     // row, and he sees the thief waiting or crossing it from anywhere
     // on that leg. While he is on it the thief does not set foot on the
     // row at all: it hides in the Storage until he has left the leg.
-    // (2) Mara near the door: the thief waits for her at (500, 620),
-    // behind the wall from her and out of Rocco's cone while he is off
-    // the south leg. If it has already reached (860, 620) it steps back
-    // to (500, 620) first: (860, 620) sits 20px south of Rocco's east
-    // leg, and he sees the thief waiting there.
-    const maraNearDoor = Math.hypot(this.guards[1].x - 928, this.guards[1].y - 510) < 300;
+    // (2) Mara on the south row: the thief only steps through the door
+    // while she is walking EAST along the row (retracing it): she faces
+    // east, so the thief entering from the west is behind her and
+    // unseen, and by the time she turns north the thief is already
+    // climbing the office east edge to the vault. Entering while she
+    // walks west, or waiting at the office south-east corner for her to
+    // come south, both put the thief in her cone: she sees it as she
+    // walks south past it.
+    const mara = this.guards[1];
+    const maraEastRow =
+      mara.y > 540 && mara.y < 580 && Math.abs(angleDifference(mara.angle, 0)) < 0.5;
     if ((plan.index === 4 || plan.index === 5) && this.guards[0].y >= 500 && !this.hiding) {
       this.hiding = true;
       this.hideMode = 'rocco';
       this.hideResumeIndex = 3;
       this.fleeIndex = null;
     }
-    if (plan.index === 5 && Math.hypot(this.thief.x - 500, this.thief.y - 620) < 30 && maraNearDoor) {
+    if (plan.index === 5 && Math.hypot(this.thief.x - 500, this.thief.y - 680) < 30 && !maraEastRow) {
       this.waitInfo = 'door:mara';
       this.setMoveInput(null);
       return;
     }
-    if (plan.index === 6 && maraNearDoor && this.fleeIndex === null) {
+    if (plan.index === 6 && !maraEastRow && this.fleeIndex === null) {
       this.fleeIndex = 4;
     }
 
-    // Gate: do not enter the vault room until Mara is on the office south
-    // row, well away from the vault: the thief then has her whole return
-    // north to crack the vault and slip back through the door gap. The
-    // gate only holds the thief once it REACHES the wait spot (the office
-    // south-east corner, clear of Mara's route): freezing mid-office
-    // while Mara patrols past is what got the thief caught.
-    if (
-      target.gate === 'vaultClear' &&
-      Math.hypot(target.x - this.thief.x, target.y - this.thief.y) < 14
-    ) {
-      const mara = this.guards[1];
-      const nearVault = Math.hypot(mara.x - 1150, mara.y - 180) < 300;
-      if (nearVault || mara.y <= 500) {
-        this.waitInfo = `gate:mara@(${Math.round(mara.x)},${Math.round(mara.y)})`;
-        this.setMoveInput(null);
-        return;
-      }
-    }
+    // No hold at the office south-east corner: the vault run is timed
+    // at the door (Mara walking east along the south row, see the door
+    // gates above), so by the time the thief reaches here she is already
+    // turning north and the thief climbs straight to the vault. Waiting
+    // here for her to come south put the thief in her cone as she
+    // walked south past it.
 
     // Stand still on the vault until it is cracked: advancing the waypoint
     // early would walk away mid-channel and the crack would never finish.
